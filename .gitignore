@@ -1,6 +1,13 @@
-﻿
-# Created by https://www.gitignore.io/api/go
-# Edit at https://www.gitignore.io/?templates=go
+
+# Created by https://www.gitignore.io/api/go,code
+# Edit at https://www.gitignore.io/?templates=go,code
+
+### Code ###
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 
 ### Go ###
 # Binaries for programs and plugins
@@ -23,18 +30,9 @@
 /vendor/
 /Godeps/
 
-# End of https://www.gitignore.io/api/go
+# End of https://www.gitignore.io/api/go,code
 
-
-# Created by https://www.gitignore.io/api/code
-# Edit at https://www.gitignore.io/?templates=code
-
-### Code ###
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-
-# End of https://www.gitignore.io/api/code
-
+##<DF>
+/tools/
+/out/
+##</DF>

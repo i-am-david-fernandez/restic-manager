@@ -7,7 +7,7 @@ version: '2'
 expansions: 3
 
 vars:
-  PROJECT: project
+  PROJECT: restic-manager
   PROJECT_PATH: "github.com/i-am-david-fernandez/{{.PROJECT}}"
 
   INTERNAL_DIR: "internal"  # Internal/package code directory
