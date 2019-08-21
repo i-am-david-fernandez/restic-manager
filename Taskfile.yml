@@ -1,0 +1,241 @@
+# https://taskfile.dev
+
+# Note: These tasks make extensive use of standard Linux tools that, by default, will not be available in Windows. However, they have been developed to work correctly with the Windows toolset available via [busybox-w32](https://frippery.org/busybox/).
+
+version: '2'
+
+expansions: 3
+
+vars:
+  PROJECT: project
+  PROJECT_PATH: "github.com/i-am-david-fernandez/{{.PROJECT}}"
+
+  INTERNAL_DIR: "internal"  # Internal/package code directory
+  COMMAND_DIR: "cmd"        # Command code directory
+  OUTPUT_DIR: "out"         # Build output directory
+  TOOLS_DIR: "tools"        # Third-party tool directory
+
+  SOURCE: "./{{.COMMAND_DIR}}/{{.PROJECT}}/main.go"
+  EXTENSION: "{{exeExt}}"
+
+  ## Default go tool configuration
+  CGO_ENABLED: 0
+  GOOS: "{{OS}}"
+  GOARCH: "{{ARCH}}"
+  GOARM: "5"
+
+tasks:
+
+## ======== ======== ======== ======== ======== ======== ======== ========
+## Tasks to initialise things
+
+  init:
+    desc: |
+      Initialise a new project skeleton.
+    cmds:
+      ## Generate .gitignore file
+      - wget -O .gitignore "https://www.gitignore.io/api/go,code"
+      - |
+        echo "
+        ##<DF>
+        /{{.TOOLS_DIR}}/
+        /{{.OUTPUT_DIR}}/
+        ##</DF>" >> .gitignore
+
+      ## Create subdirectories
+      - mkdir -p {{.INTERNAL_DIR}}
+      - mkdir -p {{.COMMAND_DIR}}/{{.PROJECT}}
+      - mkdir -p {{.OUTPUT_DIR}}
+      - mkdir -p {{.TOOLS_DIR}}
+
+      ## Initialise dependency management
+      - dep init
+
+      ## Generate skeleton source
+      - |
+        echo "
+        package {{.PROJECT}}
+
+        var VersionGitCommit string" > {{.INTERNAL_DIR}}/version.go
+
+      ## Initialise git repo (this could be dangerous, so we'll leave this out by default)
+      # # - git init
+      # # - git add --all
+      # # - git commit -m "Initial import."
+
+    silent: true
+
+  init-cobra:
+    desc: |
+      Add and initialise cobra [spf13/cobra](https://github.com/spf13/cobra).
+      This will add cobra to the project dependencies, build the helper tool,
+      and use it to create/initialise a CLI tool for this project.
+
+    vars:
+      PACKAGE: github.com/spf13/cobra/cobra
+      BINARY: "{{.TOOLS_DIR}}/cobra{{exeExt}}"
+
+    cmds:
+      - dep ensure --add {{.PACKAGE}}
+      - go build -o {{.BINARY}} vendor/{{.PACKAGE}}/main.go
+      - "{{.BINARY}} init --pkg-name {{.PROJECT_PATH}}/{{.COMMAND_DIR}}/{{.PROJECT}} {{.COMMAND_DIR}}/{{.PROJECT}}"
+      - task: cobra-add
+        vars: {command: "version"}
+
+  init-packr:
+    desc: |
+      Add and initialise packr [gobuffalo/packr](https://github.com/gobuffalo/packr/tree/master/v2).
+      This will add packr to the project dependencies and build the helper tool.
+
+    vars:
+      PACKAGE: github.com/gobuffalo/packr/v2/packr2
+      BINARY: "{{.TOOLS_DIR}}/packr{{exeExt}}"
+
+    cmds:
+      - dep ensure --add {{.PACKAGE}}
+      - go build -o {{.BINARY}} vendor/{{.PACKAGE}}/main.go
+      # - "{{.BINARY}} init {{.PROJECT_PATH}}/{{.COMMAND_DIR}}/{{.PROJECT}}"
+      # - "{{.BINARY}} add --package {{.PROJECT_PATH}}/{{.COMMAND_DIR}}/{{.PROJECT}} version"
+
+  init-statics:
+    desc: |
+      Add and initialise static [go-playground/statics](https://github.com/go-playground/statics).
+      This will add static to the project dependencies and build the helper tool.
+
+    vars:
+      PACKAGE: github.com/go-playground/statics
+      BINARY: "{{.TOOLS_DIR}}/statics{{exeExt}}"
+
+    cmds:
+      #- dep ensure --add {{.PACKAGE}}
+      #- go build -o {{.BINARY}} vendor/{{.PACKAGE}}/*.go
+      - "{{.BINARY}} -i=assets -o=assets.go -pkg=main -group=Assets -ignore=\\.gitignore -init=true"
+      # - "{{.BINARY}} init {{.PROJECT_PATH}}/{{.COMMAND_DIR}}/{{.PROJECT}}"
+      # - "{{.BINARY}} add --package {{.PROJECT_PATH}}/{{.COMMAND_DIR}}/{{.PROJECT}} version"
+
+
+## ======== ======== ======== ======== ======== ======== ======== ========
+## Tasks to clean things
+
+  clean:
+    desc: |
+      Remove build artefacts.
+    cmds:
+      - rm -f {{.OUTPUT_DIR}}/*
+
+## ======== ======== ======== ======== ======== ======== ======== ========
+## Tasks to generate things
+
+  cobra-add:
+    desc: |
+      Generate a new cobra command, specified via command=<command name>
+
+    vars:
+      BINARY:
+        sh: "realpath {{.TOOLS_DIR}}/cobra{{exeExt}}"
+
+    dir: "{{.COMMAND_DIR}}/{{.PROJECT}}"
+
+    cmds:
+      - "{{.BINARY}} add {{.command}}"
+
+
+  generate:
+    desc: |
+      Generate source material via go generate.
+
+    vars:
+      PATH:
+        sh: echo $PATH
+      TOO:
+        sh: realpath {{.TOOLS_DIR}}
+
+    env:
+      PATH: "{{.TOO}};{{.PATH}}"
+
+    # env:
+    #   PATH:
+    #     sh: echo "{{.TOOLS_DIR}};$PATH"
+    #     #sh: echo "{{.ABS_TOOLS_DIR}};$PATH"
+    #     #sh: echo "$(realpath {{.TOOLS_DIR}});$PATH"
+
+    cmds:
+      - PATH={{.TOO}} echo $PATH
+      #- go generate -v -x
+
+## ======== ======== ======== ======== ======== ======== ======== ========
+## Tasks to build things
+
+  build:
+    desc: |
+      Build the project, with target defaulting to the build host.
+
+    env:
+      CGO_ENABLED: "{{.CGO_ENABLED}}"
+      GOOS: "{{.GOOS}}"
+      GOARCH: "{{.GOARCH}}"
+      GOARM: "{{.GOARM}}"
+
+    vars:
+      BINARY: "{{.PROJECT}}_{{.GOOS}}_{{.GOARCH}}{{.EXTENSION}}"
+      GIT_COMMIT:
+        sh: git describe --tags --dirty --always # | echo "untracked"
+      GIT_COMMIT_VARIABLE: "{{.PROJECT_PATH}}/{{.INTERNAL_DIR}}.VersionGitCommit"
+
+    cmds:
+      - >
+        go build
+        -o "{{.OUTPUT_DIR}}/{{.BINARY}}"
+        -ldflags "-X {{.GIT_COMMIT_VARIABLE}}={{.GIT_COMMIT}}"
+        "{{.SOURCE}}"
+
+  build-windows:
+    desc: |
+      Build the project for a Windows amd64 target specifically.
+
+    cmds:
+      - task: build
+        vars:
+          CGO_ENABLED: 0
+          GOOS: windows
+          GOARCH: amd64
+          EXTENSION: exe
+
+  build-linux:
+    desc: |
+      Build the project for a Linux amd64 target specifically.
+
+    cmds:
+      - task: build
+        vars:
+          CGO_ENABLED: 0
+          GOOS: linux
+          GOARCH: amd64
+          EXTENSION: ""
+
+  build-pi:
+    desc: |
+      Build the project for a Raspberry Pi target specifically.
+
+    cmds:
+      - task: build
+        vars:
+          CGO_ENABLED: 0
+          GOOS: linux
+          GOARCH: arm
+          GOARM: 6
+          EXTENSION: ""
+
+## ======== ======== ======== ======== ======== ======== ======== ========
+## Tasks to run things
+
+  run:
+    vars:
+      BINARY: "{{.PROJECT}}_{{.GOOS}}_{{.GOARCH}}{{.EXTENSION}}"
+
+    cmds:
+      - >
+        "{{.OUTPUT_DIR}}/{{.BINARY}}"
+        --log-level debug
+        --config {{.PROJECT}}.sample.yml
+        version
