@@ -216,6 +216,7 @@ func (restic *Restic) Backup(profile *ProfileConfiguration) (string, error) {
 			continue
 		}
 
+		// TODO: Deprecate/remove this method of substitution.
 		// Expand/substitute source directory
 		e = strings.Replace(e, "<source>", profile.Source(), -1)
 

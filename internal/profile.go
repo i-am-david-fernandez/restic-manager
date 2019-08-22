@@ -1,10 +1,12 @@
 package resticmanager
 
 import (
+	"bytes"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+	"text/template"
 
 	"github.com/i-am-david-fernandez/glog"
 
@@ -131,6 +133,7 @@ func (profile *ProfileConfiguration) LogFile() string {
 	if profile.viper.IsSet(key) {
 		filename := profile.viper.GetString(key)
 
+		// TODO: Deprecate/remove this method of substitution.
 		// Expand/substitute source or repo directory if required
 		filename = strings.Replace(filename, "<source>", profile.Source(), -1)
 		filename = strings.Replace(filename, "<repo>", profile.Repository(), -1)
@@ -310,6 +313,39 @@ func (profile *ProfileConfiguration) SetDefaults(defaults map[string]interface{}
 	}
 }
 
+// expandSubstitutions expands fields/values that allow substitutions
+func (profile *ProfileConfiguration) expandSubstitutions() {
+
+	c := profile.viper.AllSettings()
+
+	// Substitute exclusions
+	key := "exclusions"
+	vss := profile.viper.GetStringSlice(key)
+	for i, v := range vss {
+		if tmpl, err := template.New("t").Parse(v); err != nil {
+			glog.Errorf("Could not parse template: %v", err)
+		} else {
+			var buffer bytes.Buffer
+			tmpl.Execute(&buffer, c)
+			vss[i] = buffer.String()
+		}
+	}
+	profile.viper.Set(key, vss)
+
+	// Substitute log file
+	key = "logging.file"
+	vs := profile.viper.GetString(key)
+	if tmpl, err := template.New("t").Parse(vs); err != nil {
+		glog.Errorf("Could not parse template: %v", err)
+	} else {
+		var buffer bytes.Buffer
+		tmpl.Execute(&buffer, c)
+		vs = buffer.String()
+	}
+	profile.viper.Set(key, vs)
+
+}
+
 // Load populates an existing ProfileConfiguration from a file.
 func (profile *ProfileConfiguration) Load(filename string) {
 
@@ -319,6 +355,8 @@ func (profile *ProfileConfiguration) Load(filename string) {
 	} else {
 		glog.Debugf("Read profile from %v", profile.viper.ConfigFileUsed())
 	}
+
+	profile.expandSubstitutions()
 }
 
 // MatchesFilter returns true if the ProfileConfiguration matches the specified filter criteria.
