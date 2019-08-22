@@ -133,18 +133,34 @@ type _LoggingConfig struct {
 	Append   bool
 }
 
+// An intermediate structure, primarily to ease conversion of a string Level
+// to a glog.LogLevel Level.
+type _RawLoggingConfig struct {
+	Filename string `mapstructure:"file"`
+	Level    string
+	Append   bool
+}
+
 // LoggingConfig returns the application logging configuration.
 func (appConfig *AppConfiguration) LoggingConfig() *_LoggingConfig {
 
 	key := "logging"
 
 	if appConfig.viper.IsSet(key) {
-		var c _LoggingConfig
-		appConfig.viper.UnmarshalKey(key, &c)
+		var r _RawLoggingConfig
+		if err := appConfig.viper.UnmarshalKey(key, &r); err != nil {
+			glog.Errorf("Could not retrieve configuration key %s: %v", key, err)
+			return nil
+		}
 
 		// 'Level' requires some work
 		level, _ := glog.NewLogLevel(appConfig.viper.GetString(key + ".level"))
-		c.Level = level
+
+		c := _LoggingConfig{
+			Filename: r.Filename,
+			Level:    level,
+			Append:   r.Append,
+		}
 
 		return &c
 	}
@@ -238,7 +254,10 @@ func (appConfig *AppConfiguration) EmailThresholds() map[glog.LogLevel]int {
 	rawThresholds := make(map[string]int)
 
 	if appConfig.viper.IsSet(key) {
-		appConfig.viper.UnmarshalKey(key, &rawThresholds)
+		if err := appConfig.viper.UnmarshalKey(key, &rawThresholds); err != nil {
+			glog.Errorf("Could not retrieve configuration key %s: %v", key, err)
+			return thresholds
+		}
 	}
 
 	for k, v := range rawThresholds {
@@ -347,7 +366,11 @@ func (appConfig *AppConfiguration) NewMailer() *Mailer {
 
 	if appConfig.viper.IsSet(key) {
 		mailer := NewMailer()
-		appConfig.viper.UnmarshalKey(key, mailer)
+		if err := appConfig.viper.UnmarshalKey(key, mailer); err != nil {
+			glog.Errorf("Could not retrieve configuration key %s: %v", key, err)
+			return nil
+		}
+
 		return mailer
 	}
 
