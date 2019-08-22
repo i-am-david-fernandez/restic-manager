@@ -206,7 +206,10 @@ func (profile *ProfileConfiguration) EmailThresholds() map[glog.LogLevel]int {
 	rawThresholds := make(map[string]int)
 
 	if profile.viper.IsSet(key) {
-		profile.viper.UnmarshalKey(key, &rawThresholds)
+		if err := profile.viper.UnmarshalKey(key, &rawThresholds); err != nil {
+			glog.Errorf("Could not retrieve configuration key %s: %v", key, err)
+			return thresholds
+		}
 	}
 
 	for k, v := range rawThresholds {
@@ -232,9 +235,38 @@ func (profile *ProfileConfiguration) RetentionPolicies() []RetentionPolicy {
 
 		var policies []RetentionPolicy
 
-		profile.viper.UnmarshalKey(key, &policies)
+		if err := profile.viper.UnmarshalKey(key, &policies); err != nil {
+			glog.Errorf("Could not retrieve configuration key %s: %v", key, err)
+			return nil
+		}
 
 		return policies
+	}
+
+	return nil
+}
+
+// ChangeThreshold encapsulates a set of snapshot diff change thresholds
+type ChangeThreshold struct {
+	TotalFiles int
+	TotalBytes float64
+}
+
+// ChangeThresholds returns the profile snapshot diff change thresholds.
+func (profile *ProfileConfiguration) ChangeThresholds() *ChangeThreshold {
+
+	key := "change-thresholds"
+
+	if profile.viper.IsSet(key) {
+
+		var thresholds ChangeThreshold
+
+		if err := profile.viper.UnmarshalKey(key, &thresholds); err != nil {
+			glog.Errorf("Could not retrieve configuration key %s: %v", key, err)
+			return nil
+		}
+
+		return &thresholds
 	}
 
 	return nil

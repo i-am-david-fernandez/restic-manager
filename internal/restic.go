@@ -1,13 +1,16 @@
 package resticmanager
 
 import (
+	"bufio"
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -323,4 +326,307 @@ func (restic *Restic) RebuildIndex(profile *ProfileConfiguration) (string, error
 		"rebuild-index",
 		"Rebuilding index for repository",
 	)
+}
+
+// SnapshotIDFromIndex retrieves a snapshot ID from an index, where 0 is the most-recent
+func (restic *Restic) SnapshotIDFromIndex(profile *ProfileConfiguration, index int) (string, error) {
+
+	glog.Noticef("Retrieving ID of snapshot %d for repository at %v", index, profile.Repository())
+
+	arguments := []string{"--json"}
+
+	stdout, stderr, err := restic.execute("snapshots", arguments, profile)
+
+	if err != nil {
+		glog.Criticalf("Fatal error listing files: %v\nCaptured stdout:\n%v\nCaptured stderr:\n%v", err, stdout, stderr)
+		return "", errors.New("snapshots")
+	}
+
+	if stderr != "" {
+		return "", errors.New(stderr)
+	}
+
+	var bytes = []byte(stdout)
+	var data []map[string]interface{}
+
+	err = json.Unmarshal(bytes, &data)
+	if err != nil {
+		glog.Criticalf("Fatal error listing snapshots: %v\nCaptured stdout:\n%v\nCaptured stderr:\n%v", err, stdout, stderr)
+		return "", errors.New("snapshots")
+	}
+
+	var Nsnapshots = len(data)
+
+	if Nsnapshots <= index {
+		return "", errors.New("snapshots")
+	}
+
+	if id, ok := data[Nsnapshots-index-1]["id"].(string); ok {
+		return id, nil
+	}
+
+	return "", errors.New("snapshots")
+}
+
+// Diff retrieves a difference summary between two specified snapshot IDs
+func (restic *Restic) Diff(profile *ProfileConfiguration, beforeID string, afterID string) (*SnapshotDiff, error) {
+	glog.Noticef("Diffing snapshot %s -> %s for repository at %v", beforeID, afterID, profile.Repository())
+
+	arguments := []string{
+		beforeID,
+		afterID,
+	}
+
+	stdout, stderr, err := restic.execute("diff", arguments, profile)
+
+	if err != nil {
+		glog.Criticalf("Fatal error performing diff: %v\nCaptured stdout:\n%v\nCaptured stderr:\n%v", err, stdout, stderr)
+		return nil, errors.New("diff")
+	}
+
+	diff := NewSnapshotDiff(stdout)
+
+	if thresholds := profile.ChangeThresholds(); thresholds != nil {
+
+		if thresholds.TotalFiles >= 0 {
+			totalFiles := diff.FilesNew + diff.FilesRemoved + diff.FilesChanged
+			if totalFiles > thresholds.TotalFiles {
+				glog.Warningf("Total file change threshold exceeded (%v > %v).", totalFiles, thresholds.TotalFiles)
+			}
+		}
+
+		if thresholds.TotalBytes >= 0 {
+			totalBytes := diff.BytesAdded + diff.BytesRemoved
+			if totalBytes > thresholds.TotalBytes {
+				glog.Warningf("Total size change threshold exceeded (%v > %v).", totalBytes, thresholds.TotalBytes)
+			}
+		}
+	}
+
+	if stderr != "" {
+		return diff, errors.New(stderr)
+	}
+
+	return diff, nil
+}
+
+// DiffFromIndices retrieves a difference summary between two specified snapshot indices (0 being most recent, 1 being second-most-recent, etc.)
+func (restic *Restic) DiffFromIndices(profile *ProfileConfiguration, beforeIndex int, afterIndex int) (*SnapshotDiff, error) {
+
+	snapshotBefore, err := restic.SnapshotIDFromIndex(profile, beforeIndex)
+	if err != nil {
+		glog.Errorf("Could not determine snapshot (before) at index %d: %v", beforeIndex, err)
+		return nil, errors.New("diff")
+	} else if snapshotBefore == "" {
+		glog.Errorf("Snapshot (before) at index %d does not exist.", beforeIndex)
+		return nil, errors.New("diff")
+	}
+	glog.Debugf("Snapshot (before) ID: %s", snapshotBefore)
+
+	snapshotAfter, err := restic.SnapshotIDFromIndex(profile, afterIndex)
+	if err != nil {
+		glog.Errorf("Could not determine snapshot (after) at index %d: %v", afterIndex, err)
+		return nil, errors.New("diff")
+	} else if snapshotAfter == "" {
+		glog.Errorf("Snapshot (after) at index %d does not exist.", afterIndex)
+		return nil, errors.New("diff")
+	}
+	glog.Debugf("Snapshot (after) ID: %s", snapshotAfter)
+
+	diff, err := restic.Diff(profile, snapshotBefore, snapshotAfter)
+	if err != nil {
+		glog.Errorf("%v", err)
+		return diff, errors.New("diff")
+	}
+
+	// Perform change-threshold checks if required
+
+	return diff, nil
+}
+
+// SnapshotDiff encapsulates the differences between two snapshots
+type SnapshotDiff struct {
+	Report       string
+	FilesNew     int
+	FilesRemoved int
+	FilesChanged int
+	DirsNew      int
+	DirsRemoved  int
+	BytesAdded   float64
+	BytesRemoved float64
+}
+
+// NewSnapshotDiff creates and returns a new SnapshotDiff object.
+func NewSnapshotDiff(diffText string) *SnapshotDiff {
+
+	snapshotDiff := SnapshotDiff{
+		Report:       diffText,
+		FilesNew:     0,
+		FilesRemoved: 0,
+		FilesChanged: 0,
+		DirsNew:      0,
+		DirsRemoved:  0,
+		BytesAdded:   0,
+		BytesRemoved: 0,
+	}
+
+	snapshotDiff.parse((diffText))
+
+	return &snapshotDiff
+}
+
+func (diff *SnapshotDiff) parse(diffText string) {
+
+	/*
+	 We are looking for a section as follows:
+
+	   Files:          80 new,     0 removed,     0 changed
+	   Dirs:           57 new,     0 removed
+	   Others:          0 new,     0 removed
+	   Data Blobs:     90 new,     0 removed
+	   Tree Blobs:     60 new,     3 removed
+	     Added:   27.734 MiB
+	     Removed: 941 B
+	*/
+
+	reFiles := regexp.MustCompile(`Files:\s*(\d+)\s+new,\s*(\d+)\s+removed,\s*(\d+)\s+changed`)
+	reDirs := regexp.MustCompile(`Dirs:\s*(\d+)\s+new,\s*(\d+)\s+removed`)
+	reBytesAdded := regexp.MustCompile(`Added:\s*(\d+\.?\d*)\s+(.*)`)
+	reBytesRemoved := regexp.MustCompile(`Removed:\s*(\d+\.?\d*)\s+(.*)`)
+
+	scanner := bufio.NewScanner(strings.NewReader(diffText))
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Check for "Files" section
+		if match := reFiles.FindStringSubmatch(line); match != nil {
+
+			// Try to extract "new"
+			index := 1
+			if len(match) <= index {
+				glog.Errorf("Error extracting new-file count at index %d from %v", index, match)
+			} else {
+				if count, err := strconv.Atoi(match[index]); err != nil {
+					glog.Errorf("Error converting new-file count (%s): %v", match[index], err)
+				} else {
+					diff.FilesNew = count
+				}
+			}
+
+			// Try to extract "removed"
+			index = 2
+			if len(match) <= index {
+				glog.Errorf("Error extracting removed-file count at index %d from %v", index, match)
+			} else {
+				if count, err := strconv.Atoi(match[index]); err != nil {
+					glog.Errorf("Error converting removed-file count (%s): %v", match[index], err)
+				} else {
+					diff.FilesRemoved = count
+				}
+			}
+
+			// Try to extract "changed"
+			index = 3
+			if len(match) <= index {
+				glog.Errorf("Error extracting changed-file count at index %d from %v", index, match)
+			} else {
+				if count, err := strconv.Atoi(match[index]); err != nil {
+					glog.Errorf("Error converting changed-file count (%s): %v", match[index], err)
+				} else {
+					diff.FilesChanged = count
+				}
+			}
+		}
+
+		// Check for "Dirs" section
+		if match := reDirs.FindStringSubmatch(line); match != nil {
+
+			// Try to extract "new"
+			index := 1
+			if len(match) <= index {
+				glog.Errorf("Error extracting new-dir count at index %d from %v", index, match)
+			} else {
+				if count, err := strconv.Atoi(match[index]); err != nil {
+					glog.Errorf("Error converting new-dir count (%s): %v", match[index], err)
+				} else {
+					diff.DirsNew = count
+				}
+			}
+
+			// Try to extract "removed"
+			index = 2
+			if len(match) <= index {
+				glog.Errorf("Error extracting removed-dir count at index %d from %v", index, match)
+			} else {
+				if count, err := strconv.Atoi(match[index]); err != nil {
+					glog.Errorf("Error converting removed-dir count (%s): %v", match[index], err)
+				} else {
+					diff.DirsRemoved = count
+				}
+			}
+		}
+
+		// Check for (bytes) "Added" section
+		if match := reBytesAdded.FindStringSubmatch(line); match != nil {
+
+			if len(match) < 3 {
+				glog.Errorf("Error extracting added bytes from %v", match)
+			} else {
+				// Extract number
+				index := 1
+				if value, err := strconv.ParseFloat(match[index], 64); err != nil {
+					glog.Errorf("Error converting added bytes count (%s): %v", match[index], err)
+				} else {
+					// Extract units
+					index = 2
+					switch unit := match[index]; unit {
+					case "B":
+						value *= 1
+					case "KiB":
+						value *= 1024
+					case "MiB":
+						value *= 1024 * 1024
+					case "GiB":
+						value *= 1024 * 1024 * 1024
+					case "TiB":
+						value *= 1024 * 1024 * 1024 * 1024
+					}
+
+					diff.BytesAdded = value
+				}
+			}
+		}
+
+		// Check for (bytes) "Removed" section
+		if match := reBytesRemoved.FindStringSubmatch(line); match != nil {
+
+			if len(match) < 3 {
+				glog.Errorf("Error extracting removed bytes from %v", match)
+			} else {
+				// Extract number
+				index := 1
+				if value, err := strconv.ParseFloat(match[index], 64); err != nil {
+					glog.Errorf("Error converting removed bytes count (%s): %v", match[index], err)
+				} else {
+
+					// Extract units
+					index = 2
+					switch unit := match[index]; unit {
+					case "B":
+						value *= 1
+					case "KiB":
+						value *= 1024
+					case "MiB":
+						value *= 1024 * 1024
+					case "GiB":
+						value *= 1024 * 1024 * 1024
+					case "TiB":
+						value *= 1024 * 1024 * 1024 * 1024
+					}
+
+					diff.BytesRemoved = value
+				}
+			}
+		}
+	}
 }

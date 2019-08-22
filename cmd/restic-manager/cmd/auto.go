@@ -149,6 +149,15 @@ var autoCmd = &cobra.Command{
 							proceed = false
 						}
 						glog.Infof(response)
+
+					case "diff":
+						// Show difference between latest and second-latest snapshots
+						response, err := restic.DiffFromIndices(profile, 1, 0)
+						if err != nil {
+							glog.Errorf("%v", err)
+							proceed = false
+						}
+						glog.Infof("%+v", response.Report)
 					}
 
 					if !proceed {
