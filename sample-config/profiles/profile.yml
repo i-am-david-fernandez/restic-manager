@@ -1,0 +1,47 @@
+## Profile-specific options override defaults specified in the top-level
+## application configuration. Note, however, that overriding works at the
+## top-level tag/key. For example, if a profile includes a "logging" section
+## this will completely replace the "logging" section defined in the application
+## profile-default logging section.
+
+## Profile name, used with "--filter-names" to select a subset of discovered profiles.
+name: myprofile
+## Repository password. Plaintext :(
+password: maryhadalittlelamb
+## Backup source path
+source: ./sample-data/src
+## Backup repository path
+repo: ./sample-data/repo
+## Only active profiles will be considered for processing.
+active: true
+## Optional list of tags, used with "--filter-tags" to select a subset of discovered profiles.
+tags:
+  - auto
+  - mine
+
+## Profile-specific logging options (in addition to application/global options)
+# logging:
+#   ## Template expansion can be used here.
+#   file: "{{.repo}}.restic-manager.log"
+#   level: info
+#   append: false
+
+## Profile-specific email options (in addition to application/global options)
+email:
+  # level: info
+  recipients:
+    - someone.else@gmail.com
+
+# arguments: []
+
+# operation-sequence: []
+
+# keep-policy:
+# - period: hourly
+#   value: 8
+
+## Exclusions. Each item is expanded to a "--exclude=<item>" restic argument.
+## Template expansion can be used here.
+exclusions:
+  - '*.txt'
+  - "{{.source}}/foo"

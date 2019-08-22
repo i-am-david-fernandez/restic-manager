@@ -1,0 +1,178 @@
+## Optional explicit specification of path to restic binary (required if restic is not within the system PATH)
+# executable: "path/to/restic.exe"
+
+## Optional location for restic's temporary files (will use system temporary file location if not specified)
+# tempdir: ""
+
+## Global logging options
+logging:
+  file: restic-manager.log
+  ## Specification of minimal message level to include, taken from [debug, info, notice, warning, error, critical] in that order.
+  level: debug
+  append: false
+  ## Optional "raw"/low-level logfile, useful only for debugging/development.
+  # raw: restic-manager.raw.log
+
+## Global email options
+email:
+  sender: this.is.my.email+restic-manager@gmail.com
+  recipients:
+    - this.is.your.email+restic-manager@gmail.com
+  level: info
+  ## Optional specification of email thresholds. An email will only be sent if the number of logged messages in any level is exceeded.
+  ## Each level is optional. The configuration below will effectively send an email if there is at least one message at or above "info" level.
+  thresholds:
+    - info: 1
+    - warning: 1
+    - error: 1
+    - critical: 1
+  ## SMTP server configuration
+  smtp:
+    host: smtp.gmail.com
+    password: notaverygoodpassword
+    port: 587
+    tls: true
+    username: some.gmail.user
+
+  ## Optional template for email content.
+  template: |
+    <html>
+
+    <head>
+      <style>
+        .code {
+          font-family: monospace;
+          white-space: pre;
+          vertical-align: baseline;
+          text-align: left;
+        }
+    
+        .debug {
+          color: darkgray;
+          display: table-row;
+        }
+        
+        .info {
+          color: steelblue;
+          display: table-row;
+        }
+        
+        .notice {
+          color: seagreen;
+          display: table-row;
+        }
+        
+        .warning {
+          color: orange;
+          display: table-row;
+        }
+        
+        .error {
+          color: darkred;
+          display: table-row;
+        }
+        
+        .critical {
+          color: darkorchid;
+          display: table-row;
+        }
+
+      </style>
+
+    </head>
+    
+    <body>
+
+    <div>{{.Preamble}}</div>
+
+    <h2>Log Summary</h2>
+    <table>
+          {{range .LogSummary}}
+      <tr class="code {{.Level}}">
+            <th>Messages at level {{.Level}}</th>
+            <td>{{.Count}}</td>
+      </tr>
+          {{end}}
+    </table>
+
+    <h2>Log Records</h2>
+    <table>
+    <tr>
+      <th>Time</th>
+      <th>Level</th>
+      <th>Message</th>
+    </tr>
+    {{range .LogRecords}}
+    <tr class="code {{.Level}}">
+      <td>{{.Time.Format "2006-01-02 15:04:05.000"}}</td>
+      <td>{{.Level}}</td>
+      <td>{{.Message}}</td>
+    </tr>
+    {{end}}
+    </table>
+
+    </body>
+
+    </html>
+
+## Default values for each profile (used unless overridden in a profile).
+profile-defaults:
+
+  name: ""
+  password: ""
+  source: ""
+  repo: ""
+  active: false
+  tags: []
+
+  ## Logging options, in addition to the global options.
+  logging:
+    ## The log filename can use template expansion as follows:
+    file: "{{.repo}}.restic-manager.log"
+    level: info
+    append: false
+
+  ## Email options, in addition to the global options (e.g., emails will be sent to _both_ recipient lists).
+  email:
+    level: info
+    recipients: []
+    thresholds:
+      - warning: 1
+      - error: 1
+      - critical: 1
+
+  ## Extra arguments to restic
+  arguments: []
+
+  ## Operation sequence for "auto" command
+  operation-sequence:
+    # - initialise
+    - unlock
+    - backup
+    - check
+    - apply-retention
+    - show-snapshots
+    # - show-listing
+    - diff
+
+  ## Retention policy
+  keep-policy:
+  - period: hourly
+    value: 24
+  - period: daily
+    value: 7
+  - period: weekly
+    value: 5
+  - period: monthly
+    value: 12
+  - period: yearly
+    value: 100
+
+  ## Optional list of file exclusions
+  exclusions: []
+
+  ## Optional change-threshold. A log warning will be produced (which can be coupled to an email above)
+  ## if the difference between the most-recent and second-most recent snapshots exceed these levels.
+  change-thresholds:
+    totalfiles: 40
+    totalbytes: 27e6
