@@ -208,6 +208,9 @@ func (restic *Restic) Backup(profile *ProfileConfiguration) (string, error) {
 
 	arguments = append(arguments, "--verbose=8")
 
+	// Add additional profile arguments
+	arguments = append(arguments, profile.Arguments("backup")...)
+
 	// Compose a set of exclusion options
 	for _, e := range profile.Exclusions() {
 

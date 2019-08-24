@@ -142,7 +142,9 @@ profile-defaults:
       - critical: 1
 
   ## Extra arguments to restic
-  arguments: []
+  arguments:
+    backup:
+      - "--exclude-if-present=.resticignore"
 
   ## Operation sequence for "auto" command
   operation-sequence:

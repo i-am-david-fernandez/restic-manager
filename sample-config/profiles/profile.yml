@@ -32,7 +32,7 @@ email:
   recipients:
     - someone.else@gmail.com
 
-# arguments: []
+# arguments: {}
 
 # operation-sequence: []
 

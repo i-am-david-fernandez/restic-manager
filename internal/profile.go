@@ -125,6 +125,18 @@ func (profile *ProfileConfiguration) Exclusions() []string {
 	return nil
 }
 
+// Arguments returns the profile arguments (additional arbitrary restic arguments).
+func (profile *ProfileConfiguration) Arguments(operation string) []string {
+
+	key := "arguments." + operation
+
+	if profile.viper.IsSet(key) {
+		return profile.viper.GetStringSlice(key)
+	}
+
+	return nil
+}
+
 // LogFile returns the profile logfile name.
 func (profile *ProfileConfiguration) LogFile() string {
 
