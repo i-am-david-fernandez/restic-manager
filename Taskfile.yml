@@ -232,10 +232,25 @@ tasks:
   run:
     vars:
       BINARY: "{{.PROJECT}}_{{.GOOS}}_{{.GOARCH}}{{.EXTENSION}}"
+      args: '{{.args | default "version"}}'
 
     cmds:
       - >
         "{{.OUTPUT_DIR}}/{{.BINARY}}"
         --log-level debug
-        --config {{.PROJECT}}.sample.yml
-        version
+        --config=./sample-config/app.yml
+        --profile-dir=./sample-config/profiles
+        "{{.args}}"
+
+  test:
+    vars:
+      BINARY: "{{.PROJECT}}_{{.GOOS}}_{{.GOARCH}}{{.EXTENSION}}"
+      args: '{{.args | default "version"}}'
+
+    cmds:
+      - >
+        "{{.OUTPUT_DIR}}/{{.BINARY}}"
+        --log-level debug
+        --config=./sample-config/app.yml
+        --profile=./sample-config/profiles/profile.yml
+        {{.args}}
