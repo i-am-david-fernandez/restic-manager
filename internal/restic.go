@@ -362,14 +362,14 @@ func (restic *Restic) SnapshotIDFromIndex(profile *ProfileConfiguration, index i
 	var Nsnapshots = len(data)
 
 	if Nsnapshots <= index {
-		return "", errors.New("snapshots")
+		return "", fmt.Errorf("Not enough snapshots in respository (N=%d not > index=%d)", Nsnapshots, index)
 	}
 
 	if id, ok := data[Nsnapshots-index-1]["id"].(string); ok {
 		return id, nil
 	}
 
-	return "", errors.New("snapshots")
+	return "", fmt.Errorf("Could not extract snapshot id from %v", data[Nsnapshots-index-1]["id"])
 }
 
 // Diff retrieves a difference summary between two specified snapshot IDs
@@ -419,31 +419,30 @@ func (restic *Restic) DiffFromIndices(profile *ProfileConfiguration, beforeIndex
 
 	snapshotBefore, err := restic.SnapshotIDFromIndex(profile, beforeIndex)
 	if err != nil {
-		glog.Errorf("Could not determine snapshot (before) at index %d: %v", beforeIndex, err)
-		return nil, errors.New("diff")
+		errorMessage := fmt.Sprintf("Could not determine snapshot (before) at index %d: %v", beforeIndex, err)
+		return nil, errors.New(errorMessage)
 	} else if snapshotBefore == "" {
-		glog.Errorf("Snapshot (before) at index %d does not exist.", beforeIndex)
-		return nil, errors.New("diff")
+		errorMessage := fmt.Sprintf("Snapshot (before) at index %d does not exist.", beforeIndex)
+		return nil, errors.New(errorMessage)
 	}
 	glog.Debugf("Snapshot (before) ID: %s", snapshotBefore)
 
 	snapshotAfter, err := restic.SnapshotIDFromIndex(profile, afterIndex)
 	if err != nil {
-		glog.Errorf("Could not determine snapshot (after) at index %d: %v", afterIndex, err)
-		return nil, errors.New("diff")
+		errorMessage := fmt.Sprintf("Could not determine snapshot (after) at index %d: %v", afterIndex, err)
+		return nil, errors.New(errorMessage)
 	} else if snapshotAfter == "" {
-		glog.Errorf("Snapshot (after) at index %d does not exist.", afterIndex)
-		return nil, errors.New("diff")
+		errorMessage := fmt.Sprintf("Snapshot (after) at index %d does not exist.", afterIndex)
+		return nil, errors.New(errorMessage)
 	}
 	glog.Debugf("Snapshot (after) ID: %s", snapshotAfter)
 
 	diff, err := restic.Diff(profile, snapshotBefore, snapshotAfter)
 	if err != nil {
-		glog.Errorf("%v", err)
-		return diff, errors.New("diff")
+		return diff, err
 	}
 
-	// Perform change-threshold checks if required
+	// TODO (maybe): Perform change-threshold checks if required
 
 	return diff, nil
 }
