@@ -227,6 +227,25 @@ tasks:
           EXTENSION: ""
 
 ## ======== ======== ======== ======== ======== ======== ======== ========
+## Tasks for deployment
+
+  git-tag:
+    desc: Create an annotated git tag with the specified version and message.
+    vars:
+      version: '{{.version | default ""}}'
+      message: '{{.message | default ""}}'
+    cmds:
+      - cmd: echo "Tagging version '{{.version}}' with message '{{.message}}'."
+        silent: true
+      - cmd: echo "Press ENTER to continue, CTRL-C, ENTER to abort."
+        silent: true
+      - cmd: read
+        silent: true
+      - cmd: echo "Continuing.."
+        silent: true
+      - git tag -a "{{.version}}" -m "{{.message}}"
+
+## ======== ======== ======== ======== ======== ======== ======== ========
 ## Tasks to run things
 
   run:
