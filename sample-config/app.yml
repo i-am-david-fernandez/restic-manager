@@ -125,27 +125,6 @@ profile-defaults:
   active: false
   tags: []
 
-  ## Logging options, in addition to the global options.
-  logging:
-    ## The log filename can use template expansion as follows:
-    file: "{{.repo}}.restic-manager.log"
-    level: info
-    append: false
-
-  ## Email options, in addition to the global options (e.g., emails will be sent to _both_ recipient lists).
-  email:
-    level: info
-    recipients: []
-    thresholds:
-      - warning: 1
-      - error: 1
-      - critical: 1
-
-  ## Extra arguments to restic
-  arguments:
-    backup:
-      - "--exclude-if-present=.resticignore"
-
   ## Operation sequence for "auto" command
   operation-sequence:
     # - initialise
@@ -178,3 +157,24 @@ profile-defaults:
   change-thresholds:
     totalfiles: 40
     totalbytes: 27e6
+
+  ## Extra arguments to restic
+  arguments:
+    backup:
+      - "--exclude-if-present=.resticignore"
+
+  ## Logging options, in addition to the global options.
+  logging:
+    ## The log filename can use template expansion as follows:
+    file: "{{.repo}}.restic-manager.log"
+    level: info
+    append: false
+
+  ## Email options, in addition to the global options (e.g., emails will be sent to _both_ recipient lists).
+  email:
+    level: info
+    recipients: []
+    thresholds:
+      - warning: 1
+      - error: 1
+      - critical: 1

@@ -33,6 +33,7 @@
 # End of https://www.gitignore.io/api/go,code
 
 ##<DF>
+/*.log
 /tools/
 /out/
 /sample-data
