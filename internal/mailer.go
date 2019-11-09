@@ -47,7 +47,7 @@ func (mailer *Mailer) SendMail(sender string, recipients []string, subject strin
 
 	// Send the email
 	if err := d.DialAndSend(m); err != nil {
-		glog.Errorf("Could not send mail: ", err)
+		glog.Errorf("Could not send mail: %s", err)
 	}
 }
 
