@@ -2,10 +2,10 @@ package cmd
 
 import (
 	"github.com/i-am-david-fernandez/glog"
-	"github.com/i-am-david-fernandez/restic-manager/internal"
+	resticmanager "github.com/i-am-david-fernandez/restic-manager/internal"
 )
 
-func simpleCommand(resticFunction func(*resticmanager.ProfileConfiguration) (string, error), description string) {
+func simpleCommand(resticFunction func(*resticmanager.ProfileConfiguration) (string, error), description string, checkRepo bool) {
 
 	const logNameProfile = "profile"
 	const logNameSession = "session"
@@ -28,7 +28,13 @@ func simpleCommand(resticFunction func(*resticmanager.ProfileConfiguration) (str
 
 		restic := resticmanager.NewRestic(resticmanager.AppConfig)
 
-		exists, err := restic.RepoExists(profile)
+		var exists bool = true
+		var err error = nil
+
+		if checkRepo {
+			exists, err = restic.RepoExists(profile)
+		}
+
 		if err != nil {
 			glog.Errorf("Could not determine state of repository path: %v", err)
 		} else if !exists {

@@ -36,7 +36,7 @@ var rebuildIndexCmd = &cobra.Command{
 		fmt.Println("rebuild-index called")
 
 		restic := resticmanager.NewRestic(resticmanager.AppConfig)
-		simpleCommand(restic.RebuildIndex, "Performing repository index rebuilding.")
+		simpleCommand(restic.RebuildIndex, "Performing repository index rebuilding.", true)
 	},
 }
 

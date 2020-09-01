@@ -36,7 +36,7 @@ var cleanCmd = &cobra.Command{
 		fmt.Println("clean called")
 
 		restic := resticmanager.NewRestic(resticmanager.AppConfig)
-		simpleCommand(restic.Clean, "Performing repository cleaning.")
+		simpleCommand(restic.Clean, "Performing repository cleaning.", true)
 	},
 }
 

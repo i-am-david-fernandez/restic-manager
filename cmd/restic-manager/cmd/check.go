@@ -36,7 +36,7 @@ var checkCmd = &cobra.Command{
 		fmt.Println("check called")
 
 		restic := resticmanager.NewRestic(resticmanager.AppConfig)
-		simpleCommand(restic.Check, "Performing repository check.")
+		simpleCommand(restic.Check, "Performing repository check.", true)
 	},
 }
 

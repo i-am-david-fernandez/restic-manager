@@ -36,7 +36,7 @@ var unlockCmd = &cobra.Command{
 		fmt.Println("unlock called")
 
 		restic := resticmanager.NewRestic(resticmanager.AppConfig)
-		simpleCommand(restic.Unlock, "Performing repository unlock.")
+		simpleCommand(restic.Unlock, "Performing repository unlock.", false)
 	},
 }
 

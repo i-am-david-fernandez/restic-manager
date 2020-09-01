@@ -36,7 +36,7 @@ var applyRetentionCmd = &cobra.Command{
 		fmt.Println("applyRetention called")
 
 		restic := resticmanager.NewRestic(resticmanager.AppConfig)
-		simpleCommand(restic.ApplyRetentionPolicy, "Performing retention policy application.")
+		simpleCommand(restic.ApplyRetentionPolicy, "Performing retention policy application.", true)
 	},
 }
 

@@ -36,7 +36,7 @@ var backupCmd = &cobra.Command{
 		fmt.Println("backup called")
 
 		restic := resticmanager.NewRestic(resticmanager.AppConfig)
-		simpleCommand(restic.Backup, "Performing backup.")
+		simpleCommand(restic.Backup, "Performing backup.", true)
 	},
 }
 

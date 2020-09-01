@@ -36,7 +36,7 @@ var snapshotsCmd = &cobra.Command{
 		fmt.Println("snapshots called")
 
 		restic := resticmanager.NewRestic(resticmanager.AppConfig)
-		simpleCommand(restic.Snapshots, "Performing snapshot listing.")
+		simpleCommand(restic.Snapshots, "Performing snapshot listing.", true)
 	},
 }
 
