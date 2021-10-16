@@ -199,7 +199,7 @@ tasks:
           CGO_ENABLED: 0
           GOOS: windows
           GOARCH: amd64
-          EXTENSION: exe
+          EXTENSION: ".exe"
 
   build-linux:
     desc: |
